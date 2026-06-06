@@ -2,20 +2,8 @@
 import { useState } from "react";
 import Card from "../components/Card";
 
-export default function SettingsPage() {
-  const [settings, setSettings] = useState({
-    emailNotifications: true,
-    pushNotifications: false,
-    weeklyReport: true,
-    autoTagging: true,
-    darkMode: false,
-    twoFactor: false,
-    currency: "USD",
-    language: "English",
-    theme: "light",
-  });
-
-  const SettingRow = ({ title, description, children }) => (
+function SettingRow({ title, description, children }) {
+  return (
     <div style={{
       padding: "20px 0",
       borderBottom: "1px solid var(--border)",
@@ -35,8 +23,10 @@ export default function SettingsPage() {
       {children}
     </div>
   );
+}
 
-  const Toggle = ({ enabled, onChange }) => (
+function Toggle({ enabled, onChange }) {
+  return (
     <button
       onClick={() => onChange(!enabled)}
       style={{
@@ -57,8 +47,10 @@ export default function SettingsPage() {
       }} />
     </button>
   );
+}
 
-  const Select = ({ value, options, onChange }) => (
+function Select({ value, options, onChange }) {
+  return (
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
@@ -78,6 +70,20 @@ export default function SettingsPage() {
       ))}
     </select>
   );
+}
+
+export default function SettingsPage() {
+  const [settings, setSettings] = useState({
+    emailNotifications: true,
+    pushNotifications: false,
+    weeklyReport: true,
+    autoTagging: true,
+    darkMode: false,
+    twoFactor: false,
+    currency: "USD",
+    language: "English",
+    theme: "light",
+  });
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>

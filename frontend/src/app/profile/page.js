@@ -1,22 +1,26 @@
 "use client";
-import { useState } from "react";
+
+import { useState, useEffect } from "react";
+import { useAuth } from "../context/AuthContext";
+import { api } from "../lib/api";
 import Card from "../components/Card";
 
-export default function ProfilePage() {
-  const [editing, setEditing] = useState(false);
-  const [profile, setProfile] = useState({
-    name: "Jane Doe",
-    email: "jane@acmecorp.io",
-    company: "Acme Corporation",
-    phone: "+1 (555) 123-4567",
-    role: "Finance Manager",
-    location: "San Francisco, CA",
-    joinDate: "January 15, 2024",
-    receiptsProcessed: 284,
-    totalSpent: "$12,438.50",
-  });
+const buildProfile = (user) => ({
+  name: user?.name || user?.username || "",
+  email: user?.email || "",
+  company: user?.company || "Acme Corporation",
+  phone: user?.phone || "",
+  role: user?.role || "Finance Member",
+  location: user?.location || "",
+  joinDate: user?.joinDate || "",
+  receiptsProcessed: user?.receiptsProcessed || 0,
+  totalSpent: typeof user?.totalSpent === "number"
+    ? `$${user.totalSpent.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    : user?.totalSpent || "$0.00",
+});
 
-  const StatCard = ({ label, value }) => (
+function StatCard({ label, value }) {
+  return (
     <Card style={{ padding: "16px 20px" }}>
       <div style={{ fontSize: 11, color: "var(--text3)", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700 }}>
         {label}
@@ -26,11 +30,50 @@ export default function ProfilePage() {
       </div>
     </Card>
   );
+}
+
+export default function ProfilePage() {
+  const { user, loadUser } = useAuth();
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [profile, setProfile] = useState(() => buildProfile(user));
+
+  useEffect(() => {
+    const profileTimer = window.setTimeout(() => {
+      setProfile(buildProfile(user));
+    }, 0);
+
+    return () => window.clearTimeout(profileTimer);
+  }, [user]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await api.put("/auth/me/", {
+        username: profile.name,
+        email: profile.email,
+      });
+      await loadUser();
+      setEditing(false);
+    } catch (err) {
+      alert("Error saving profile: " + err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const getInitials = (name) => {
+    if (!name) return "U";
+    return name.substring(0, 2).toUpperCase();
+  };
+
+  const rawSpent = parseFloat(profile.totalSpent.replace(/[$,]/g, "")) || 0;
+  const avgSpent = profile.receiptsProcessed > 0 ? (rawSpent / profile.receiptsProcessed) : 0;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
       {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <div style={{ display: "flex", alignItems: "center", justifySpaceBetween: "space-between", justifyContent: "space-between" }}>
         <div>
           <h1 style={{ fontSize: 28, fontWeight: 800, margin: "0 0 8px", color: "var(--text)" }}>
             My Profile
@@ -40,7 +83,13 @@ export default function ProfilePage() {
           </p>
         </div>
         <button
-          onClick={() => setEditing(!editing)}
+          onClick={() => {
+            if (editing) {
+              // reset back to user context
+              setProfile(buildProfile(user));
+            }
+            setEditing(!editing);
+          }}
           style={{
             padding: "10px 20px",
             background: editing ? "rgba(239, 68, 68, 0.1)" : "rgba(124, 58, 237, 0.1)",
@@ -74,40 +123,26 @@ export default function ProfilePage() {
               display: "flex", alignItems: "center", justifyContent: "center",
               fontSize: 40, fontWeight: 700, color: "#fff",
             }}>
-              JD
+              {getInitials(profile.name)}
             </div>
-            {editing && (
-              <button style={{
-                padding: "8px 16px",
-                background: "rgba(124, 58, 237, 0.1)",
-                border: "1px solid rgba(124, 58, 237, 0.3)",
-                color: "var(--purple)",
-                borderRadius: 6,
-                fontSize: 12,
-                fontWeight: 600,
-                cursor: "pointer",
-              }}>
-                Change Avatar
-              </button>
-            )}
           </div>
 
           {/* Info Section */}
           <div style={{ flex: 1 }}>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
               {[
-                { label: "Full Name", value: profile.name, key: "name" },
-                { label: "Email", value: profile.email, key: "email" },
-                { label: "Company", value: profile.company, key: "company" },
-                { label: "Role", value: profile.role, key: "role" },
-                { label: "Phone", value: profile.phone, key: "phone" },
-                { label: "Location", value: profile.location, key: "location" },
+                { label: "Username / Full Name", value: profile.name, key: "name", editable: true },
+                { label: "Email Address", value: profile.email, key: "email", editable: true },
+                { label: "Company", value: profile.company, key: "company", editable: false },
+                { label: "Role", value: profile.role, key: "role", editable: false },
+                { label: "Phone", value: profile.phone || "Not provided", key: "phone", editable: false },
+                { label: "Location", value: profile.location || "Not provided", key: "location", editable: false },
               ].map((field) => (
                 <div key={field.key}>
                   <label style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text3)", display: "block", marginBottom: 6 }}>
                     {field.label}
                   </label>
-                  {editing ? (
+                  {editing && field.editable ? (
                     <input
                       type="text"
                       value={field.value}
@@ -120,6 +155,7 @@ export default function ProfilePage() {
                         fontSize: 14,
                         fontFamily: "var(--font-sans)",
                         color: "var(--text)",
+                        background: "var(--surface2)",
                       }}
                     />
                   ) : (
@@ -140,21 +176,25 @@ export default function ProfilePage() {
               Member Since
             </p>
             <p style={{ margin: 0, fontSize: 14, color: "var(--text)", fontWeight: 600 }}>
-              {profile.joinDate}
+              {profile.joinDate || "N/A"}
             </p>
           </div>
           {editing && (
-            <button style={{
-              padding: "10px 24px",
-              background: "linear-gradient(135deg, var(--purple), var(--blue))",
-              border: "none",
-              color: "#fff",
-              borderRadius: 8,
-              fontWeight: 600,
-              fontSize: 13,
-              cursor: "pointer",
-            }}>
-              Save Changes
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              style={{
+                padding: "10px 24px",
+                background: "linear-gradient(135deg, var(--brand), var(--brand2))",
+                border: "none",
+                color: "#fff",
+                borderRadius: 8,
+                fontWeight: 600,
+                fontSize: 13,
+                cursor: saving ? "not-allowed" : "pointer",
+              }}
+            >
+              {saving ? "Saving..." : "Save Changes"}
             </button>
           )}
         </div>
@@ -168,78 +208,9 @@ export default function ProfilePage() {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16 }}>
           <StatCard label="Receipts Processed" value={profile.receiptsProcessed} />
           <StatCard label="Total Amount" value={profile.totalSpent} />
-          <StatCard label="Average Per Receipt" value={`$${(parseInt(profile.totalSpent.replace(/[$,]/g, '')) / profile.receiptsProcessed).toFixed(2)}`} />
+          <StatCard label="Average Per Receipt" value={`$${avgSpent.toFixed(2)}`} />
           <StatCard label="Processing Accuracy" value="98.2%" />
         </div>
-      </div>
-
-      {/* Actions */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-        <Card style={{ padding: "20px 24px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-            <div style={{
-              width: 48, height: 48, borderRadius: 10,
-              background: "rgba(59, 130, 246, 0.1)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 20,
-            }}>
-              🔐
-            </div>
-            <div style={{ flex: 1 }}>
-              <h4 style={{ margin: "0 0 4px", fontSize: 13, fontWeight: 700, color: "var(--text)" }}>
-                Change Password
-              </h4>
-              <p style={{ margin: 0, fontSize: 12, color: "var(--text2)" }}>
-                Update your password regularly
-              </p>
-            </div>
-            <button style={{
-              padding: "6px 16px",
-              background: "rgba(59, 130, 246, 0.1)",
-              border: "1px solid rgba(59, 130, 246, 0.3)",
-              color: "#3b82f6",
-              borderRadius: 6,
-              fontSize: 12,
-              fontWeight: 600,
-              cursor: "pointer",
-            }}>
-              Update
-            </button>
-          </div>
-        </Card>
-
-        <Card style={{ padding: "20px 24px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-            <div style={{
-              width: 48, height: 48, borderRadius: 10,
-              background: "rgba(16, 185, 129, 0.1)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 20,
-            }}>
-              ✅
-            </div>
-            <div style={{ flex: 1 }}>
-              <h4 style={{ margin: "0 0 4px", fontSize: 13, fontWeight: 700, color: "var(--text)" }}>
-                Two-Factor Auth
-              </h4>
-              <p style={{ margin: 0, fontSize: 12, color: "var(--text2)" }}>
-                Enhance your account security
-              </p>
-            </div>
-            <button style={{
-              padding: "6px 16px",
-              background: "rgba(16, 185, 129, 0.1)",
-              border: "1px solid rgba(16, 185, 129, 0.3)",
-              color: "#10b981",
-              borderRadius: 6,
-              fontSize: 12,
-              fontWeight: 600,
-              cursor: "pointer",
-            }}>
-              Enable
-            </button>
-          </div>
-        </Card>
       </div>
     </div>
   );

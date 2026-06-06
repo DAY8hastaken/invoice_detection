@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Card from "../components/Card";
 import { RECEIPTS, STATS, CATEGORY_BREAKDOWN, MONTHLY_TREND } from "../lib/mockData";
+import { api } from "../lib/api";
 
 /* ── Sparkline SVG ── */
 function Sparkline({ data, color }) {
@@ -133,6 +134,16 @@ export default function DashboardPage() {
   const [files, setFiles] = useState([]);
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [addUserOpen, setAddUserOpen] = useState(false);
+  const [addUserForm, setAddUserForm] = useState({
+    username: "",
+    email: "",
+    password: "",
+    confirm_password: "",
+  });
+  const [addUserSaving, setAddUserSaving] = useState(false);
+  const [addUserError, setAddUserError] = useState("");
+  const [addUserSuccess, setAddUserSuccess] = useState("");
   const inputRef = useRef(null);
   const router = useRouter();
 
@@ -206,6 +217,53 @@ export default function DashboardPage() {
     setUploading(false);
     setFiles([]);
     router.push("/result");
+  };
+
+  const openAddUser = () => {
+    setAddUserOpen(true);
+    setAddUserError("");
+    setAddUserSuccess("");
+  };
+
+  const closeAddUser = () => {
+    if (addUserSaving) return;
+    setAddUserOpen(false);
+    setAddUserForm({
+      username: "",
+      email: "",
+      password: "",
+      confirm_password: "",
+    });
+    setAddUserError("");
+    setAddUserSuccess("");
+  };
+
+  const updateAddUserField = (field, value) => {
+    setAddUserForm((current) => ({ ...current, [field]: value }));
+    setAddUserError("");
+    setAddUserSuccess("");
+  };
+
+  const submitAddUser = async (event) => {
+    event.preventDefault();
+    setAddUserSaving(true);
+    setAddUserError("");
+    setAddUserSuccess("");
+
+    try {
+      await api.post("/auth/register/", addUserForm);
+      setAddUserSuccess(`User ${addUserForm.username} created.`);
+      setAddUserForm({
+        username: "",
+        email: "",
+        password: "",
+        confirm_password: "",
+      });
+    } catch (error) {
+      setAddUserError(error.message || "Could not create user.");
+    } finally {
+      setAddUserSaving(false);
+    }
   };
 
   const v = (n) => ({
@@ -301,7 +359,7 @@ export default function DashboardPage() {
           <>
             <QuickAction icon="💰" label="New Expense" />
             <QuickAction icon="📋" label="New Report" />
-            <QuickAction icon="👤" label="Add User" />
+            <QuickAction icon="👤" label="Add User" onClick={openAddUser} />
           </>
         )}
       </div>
@@ -618,6 +676,152 @@ export default function DashboardPage() {
           </div>
         </Card>
       </div>
+
+      {addUserOpen && (
+        <div
+          onClick={closeAddUser}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 1000,
+            background: "rgba(15,23,42,0.45)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 20,
+          }}
+        >
+          <form
+            onSubmit={submitAddUser}
+            onClick={(event) => event.stopPropagation()}
+            style={{
+              width: "min(440px, 100%)",
+              borderRadius: 12,
+              background: "var(--surface)",
+              border: "1px solid var(--border2)",
+              boxShadow: "0 24px 70px rgba(0,0,0,0.22)",
+              padding: 22,
+              display: "flex",
+              flexDirection: "column",
+              gap: 14,
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+              <div>
+                <h2 style={{
+                  margin: 0,
+                  fontFamily: "var(--font-display)",
+                  fontSize: 18,
+                  fontWeight: 800,
+                  color: "var(--text)",
+                }}>
+                  Add User
+                </h2>
+                <p style={{ margin: "4px 0 0", fontSize: 12, color: "var(--text3)" }}>
+                  Create a login for a new workspace member.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeAddUser}
+                disabled={addUserSaving}
+                aria-label="Close add user"
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: 8,
+                  border: "1px solid var(--border2)",
+                  background: "var(--surface2)",
+                  color: "var(--text2)",
+                  cursor: addUserSaving ? "not-allowed" : "pointer",
+                  fontSize: 18,
+                  lineHeight: 1,
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            {[
+              { key: "username", label: "Username", type: "text", autoComplete: "username" },
+              { key: "email", label: "Email", type: "email", autoComplete: "email" },
+              { key: "password", label: "Password", type: "password", autoComplete: "new-password" },
+              { key: "confirm_password", label: "Confirm Password", type: "password", autoComplete: "new-password" },
+            ].map((field) => (
+              <label key={field.key} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text2)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                  {field.label}
+                </span>
+                <input
+                  type={field.type}
+                  value={addUserForm[field.key]}
+                  autoComplete={field.autoComplete}
+                  minLength={field.type === "password" ? 6 : undefined}
+                  required
+                  disabled={addUserSaving}
+                  onChange={(event) => updateAddUserField(field.key, event.target.value)}
+                  style={{
+                    height: 40,
+                    borderRadius: 8,
+                    border: "1px solid var(--border2)",
+                    background: "var(--surface2)",
+                    color: "var(--text)",
+                    padding: "0 12px",
+                    fontSize: 13,
+                    outline: "none",
+                  }}
+                />
+              </label>
+            ))}
+
+            {addUserError && (
+              <div style={{
+                padding: "10px 12px",
+                borderRadius: 8,
+                background: "rgba(244,63,94,0.1)",
+                border: "1px solid rgba(244,63,94,0.2)",
+                color: "#f43f5e",
+                fontSize: 12,
+              }}>
+                {addUserError}
+              </div>
+            )}
+
+            {addUserSuccess && (
+              <div style={{
+                padding: "10px 12px",
+                borderRadius: 8,
+                background: "rgba(16,185,129,0.1)",
+                border: "1px solid rgba(16,185,129,0.2)",
+                color: "#10b981",
+                fontSize: 12,
+              }}>
+                {addUserSuccess}
+              </div>
+            )}
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 4 }}>
+              <button
+                type="button"
+                className="btn-ghost"
+                onClick={closeAddUser}
+                disabled={addUserSaving}
+                style={{ opacity: addUserSaving ? 0.6 : 1 }}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="btn-primary"
+                disabled={addUserSaving}
+                style={{ opacity: addUserSaving ? 0.6 : 1 }}
+              >
+                {addUserSaving ? "Creating..." : "Create User"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 }

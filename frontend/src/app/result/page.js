@@ -254,19 +254,22 @@ export default function ResultPage() {
   const [show, setShow] = useState(false);
   const [receipts, setReceipts] = useState([]);
   const [loaded, setLoaded] = useState(false);
+  const [actionMessage, setActionMessage] = useState("");
 
   useEffect(() => {
-    // Load receipts from localStorage
-    const stored = localStorage.getItem("processedReceipts");
-    if (stored) {
-      try {
-        setReceipts(JSON.parse(stored));
-      } catch (e) {
-        console.error("Error parsing receipts:", e);
+    const t = setTimeout(() => {
+      const stored = localStorage.getItem("processedReceipts");
+      if (stored) {
+        try {
+          setReceipts(JSON.parse(stored));
+        } catch (e) {
+          console.error("Error parsing receipts:", e);
+        }
       }
-    }
-    setLoaded(true);
-    const t = setTimeout(() => setShow(true), 80);
+      setLoaded(true);
+      setShow(true);
+    }, 80);
+
     return () => clearTimeout(t);
   }, []);
 
@@ -276,11 +279,82 @@ export default function ResultPage() {
     transition: `opacity 0.5s ease ${n * 80}ms, transform 0.5s cubic-bezier(.22,.68,0,1.2) ${n * 80}ms`,
   });
 
-  const totalAmount = receipts.reduce((sum, r) => sum + r.amount, 0);
-  const totalTax = receipts.reduce((sum, r) => sum + r.tax, 0);
+  const totalAmount = receipts.reduce((sum, r) => sum + Number(r.amount || 0), 0);
+  const totalTax = receipts.reduce((sum, r) => sum + Number(r.tax || 0), 0);
   const avgConfidence = receipts.length > 0 
     ? Math.round((receipts.reduce((sum, r) => sum + r.confidence, 0) / receipts.length) * 10) / 10 
     : 0;
+
+  const showActionMessage = (message) => {
+    setActionMessage(message);
+    window.setTimeout(() => setActionMessage(""), 2600);
+  };
+
+  const handleExportJson = () => {
+    if (!receipts.length) {
+      showActionMessage("No receipts to export.");
+      return;
+    }
+
+    const payload = {
+      exportedAt: new Date().toISOString(),
+      receiptCount: receipts.length,
+      totals: {
+        amount: totalAmount,
+        tax: totalTax,
+        averageConfidence: avgConfidence,
+      },
+      receipts,
+    };
+
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    const stamp = new Date().toISOString().slice(0, 10);
+
+    link.href = url;
+    link.download = `finsight-receipts-${stamp}.json`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    showActionMessage("JSON exported.");
+  };
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const handleShare = async () => {
+    if (!receipts.length) {
+      showActionMessage("No receipts to share.");
+      return;
+    }
+
+    const text = `FinSight receipt report: ${receipts.length} receipt${receipts.length !== 1 ? "s" : ""}, ${fmt(totalAmount)} total.`;
+    const shareData = {
+      title: "FinSight Receipt Report",
+      text,
+      url: window.location.href,
+    };
+
+    try {
+      if (navigator.share) {
+        await navigator.share(shareData);
+        showActionMessage("Share opened.");
+        return;
+      }
+
+      await navigator.clipboard.writeText(`${text}\n${window.location.href}`);
+      showActionMessage("Share link copied.");
+    } catch (error) {
+      if (error.name !== "AbortError") {
+        showActionMessage("Share failed.");
+      }
+    }
+  };
 
   return (
     <div style={{ position: "relative", minHeight: "100vh", display: "flex", flexDirection: "column" }}>
@@ -422,19 +496,34 @@ export default function ResultPage() {
 
         {/* Action buttons */}
         <div style={{ ...delay(receipts.length + 2), display: "flex", gap: 10, flexWrap: "wrap" }}>
-          <button className="btn-accent" style={{ flex: 1, minWidth: 140 }}>
+          <button
+            className="btn-ghost"
+            onClick={handleExportJson}
+            disabled={!loaded || receipts.length === 0}
+            style={{ flex: 1, minWidth: 140, justifyContent: "center", opacity: !loaded || receipts.length === 0 ? 0.55 : 1 }}
+          >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
             </svg>
             Export JSON
           </button>
-          <button className="btn-ghost" style={{ flex: 1, minWidth: 140, justifyContent: "center" }}>
+          <button
+            className="btn-ghost"
+            onClick={handlePrint}
+            disabled={!loaded || receipts.length === 0}
+            style={{ flex: 1, minWidth: 140, justifyContent: "center", opacity: !loaded || receipts.length === 0 ? 0.55 : 1 }}
+          >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/>
             </svg>
             Print
           </button>
-          <button className="btn-ghost" style={{ flex: 1, minWidth: 140, justifyContent: "center" }}>
+          <button
+            className="btn-ghost"
+            onClick={handleShare}
+            disabled={!loaded || receipts.length === 0}
+            style={{ flex: 1, minWidth: 140, justifyContent: "center", opacity: !loaded || receipts.length === 0 ? 0.55 : 1 }}
+          >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
               <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
@@ -442,6 +531,17 @@ export default function ResultPage() {
             Share
           </button>
         </div>
+
+        {actionMessage && (
+          <div style={{
+            ...delay(receipts.length + 3),
+            fontSize: 12,
+            color: "var(--ink-3)",
+            textAlign: "center",
+          }}>
+            {actionMessage}
+          </div>
+        )}
       </main>
     </div>
   );

@@ -1,5 +1,6 @@
 "use client";
 import { useState, useRef } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import Card from "../components/Card";
 
@@ -386,6 +387,7 @@ export default function UploadPage() {
                   }}
                 >
                   <div style={{
+                    position: "relative",
                     width: "100%",
                     height: 140,
                     overflow: "hidden",
@@ -394,14 +396,13 @@ export default function UploadPage() {
                     alignItems: "center",
                     justifyContent: "center",
                   }}>
-                    <img
+                    <Image
                       src={fileObj.preview}
                       alt={fileObj.file.name}
-                      style={{
-                        maxHeight: "100%",
-                        maxWidth: "100%",
-                        objectFit: "contain",
-                      }}
+                      fill
+                      sizes="140px"
+                      style={{ objectFit: "contain" }}
+                      unoptimized
                     />
                   </div>
 

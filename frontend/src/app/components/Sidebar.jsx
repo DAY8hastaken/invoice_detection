@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useAuth } from "../context/AuthContext";
 
 const Icon = ({ name, size = 15 }) => {
   const icons = {
@@ -51,12 +52,18 @@ const Icon = ({ name, size = 15 }) => {
 const NAV = [
   { id: "dashboard", label: "Dashboard",      href: "/dashboard", icon: "grid"      },
   { id: "upload",    label: "Upload Receipt", href: "/upload",    icon: "upload"    },
-  { id: "history",   label: "History",        href: "/history",   icon: "clock",  badge: "284" },
+  { id: "history",   label: "History",        href: "/history",   icon: "clock"     },
   { id: "reports",   label: "Reports",        href: "/reports",   icon: "bar-chart" },
 ];
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const { user } = useAuth();
+
+  const getInitials = (name) => {
+    if (!name) return "U";
+    return name.substring(0, 2).toUpperCase();
+  };
 
   return (
     <aside className="layout-sidebar">
@@ -92,7 +99,7 @@ export default function Sidebar() {
       {/* Workspace pill */}
       <div style={{ padding: "12px 14px 8px" }}>
         <div style={{
-          display: "flex", alignItems: "center", justifyContent: "space-between",
+          display: "flex", alignItems: "center", justifySpaceBetween: "space-between",
           padding: "8px 10px", borderRadius: 8,
           background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)",
           cursor: "pointer",
@@ -132,14 +139,6 @@ export default function Sidebar() {
                 <Icon name={item.icon} size={15} />
               </span>
               <span style={{ flex: 1 }}>{item.label}</span>
-              {item.badge && (
-                <span style={{
-                  fontSize: 10, fontWeight: 700,
-                  background: isActive ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.08)",
-                  color: isActive ? "#fff" : "rgba(255,255,255,0.45)",
-                  padding: "1px 7px", borderRadius: 20,
-                }}>{item.badge}</span>
-              )}
             </Link>
           );
         })}
@@ -184,11 +183,15 @@ export default function Sidebar() {
               e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)";
             }}
           >
-            <div className="avatar" style={{ width: 30, height: 30, fontSize: 11 }}>JD</div>
+            <div className="avatar" style={{ width: 30, height: 30, fontSize: 11 }}>
+              {getInitials(user?.username)}
+            </div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.9)" }}>Jane Doe</div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.9)", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>
+                {user?.username || "Guest User"}
+              </div>
               <div style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                jane@acmecorp.io
+                {user?.email || "No email available"}
               </div>
             </div>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
